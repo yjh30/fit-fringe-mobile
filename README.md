@@ -4,8 +4,11 @@
 ## 1、刘海手机示意图
 
 <img src="./images/all.png" width="720" height="730" div align=left />
+<br />
+  
 <img src="./images/iphoneX.png" width="960" height="480" div align=left />
-
+<br />
+  
 
 ## 2、css适配iphoneX
 ```css
