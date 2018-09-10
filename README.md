@@ -106,22 +106,22 @@ stylus语法
 ## 6、公共组件Layout
 
 - 对于非刘海屏手机不受影响（头部、底部渐进增强）
-- 定义一个顶部安全区域元素，默认为以iphone6为标准的状态栏高度20dp(padding-top表示)，不支持沉浸式的安卓4.4以下手机 为隐藏状态，微信环境下为隐藏状态，刘海屏手机通过jsbridge获取safeInsetTop值重绘顶部安全区域元素padding-top值，scroller元素top值
-- 适配webview底部，在刘海屏手机app webview中，手机安全区域距离屏幕下边的距离统一为34dp，scroller元素fixed定位bottom为34dp，另外增加一个safe-el的样式类padding-bottom为34dp
+- 定义一个顶部安全区域元素，默认为以iphone6为标准的状态栏高度20dp(padding-top表示)，不支持沉浸式的安卓4.4以下手机 为隐藏状态，微信环境下为隐藏状态，刘海屏手机目前是通过userAgent(之前想法是通过jsbridge获取safeInsetTop后重绘，重绘体验不好，弃用)获取safeInsetTop值同步顶部安全区域元素padding-top值，scroller元素top值
+- 适配webview底部，在刘海屏手机app webview中，手机安全区域距离屏幕下边的距离统一为34dp，scroller元素fixed定位bottom为34dp，另外增加一个safe-el的样式类padding-bottom为34dp，根据视觉ui效果微调 安全区域距离屏幕下边的距离由34dp微调为20dp
 
 ```html
 <div class="page-layout">
-  <div ref="topBar" class="page-layout-topbar fixed">
+  <div class="page-layout-topbar fixed">
     <div 
-      ref="safeAreaInsetTop" 
       class="safe-area-inset-top" 
-      v-if="safeAreaInsetTopVisible">
+      v-if="safeAreaInsetTopVisible"
+      :style="[ safeAreaInsetTopStyle ]">
     </div>
 
     <slot name="header"></slot>
   </div>
 
-  <div ref="scroller" class="page-layout-scroller fixed">
+  <div class="page-layout-scroller fixed" :style="[ scrollerStyle ]">
     <slot></slot>
   </div>
 
@@ -132,12 +132,27 @@ stylus语法
 ```
 stylus
 ```css
-.page-layout {
-  &.fringe-screen .safe-el  {
-    box-sizing content-box
+.fringe-screen {
+  /* 以iphoneX为准，安全区域距离屏幕下边的距离为34dp，这里微调为20dp，以实际视觉效果为准 */
+  .page-layout-scroller {
+    bottom: 40px!important;
+  }
+  /* 以iphoneX为准，安全区域距离屏幕下边的距离为34dp，这里微调为20dp，以实际视觉效果为准 */
+  .safe-el  {
+    box-sizing content-box!important;
+    padding-bottom 40px!important;
+  }
+}
 
-    /* 以iphoneX为准，安全区域距离屏幕下边的距离为68物理像素 */
-    padding-bottom 68px
+[data-dpr="1"] .fringe-screen {
+  /* 以iphoneX为准，安全区域距离屏幕下边的距离为34dp，1倍的安卓统一处理为34dp */
+  .page-layout-scroller {
+    bottom: 34px!important;
+  }
+  /* 以iphoneX为准，安全区域距离屏幕下边的距离为34dp，1倍的安卓统一处理为34dp */
+  .safe-el {
+    box-sizing content-box!important;
+    padding-bottom 34px!important;
   }
 }
 ```
@@ -170,11 +185,6 @@ stylus scoped
       /* iphone6 状态栏默认40物理像素 */
       padding-top 40px
     }
-  }
-
-  /* 以iphoneX为准，安全区域距离屏幕下边的距离为68物理像素 */
-  &.fringe-screen &-scroller {
-    bottom: 68px!important;
   }
 
   &.wechart-env &-scroller {
@@ -221,12 +231,68 @@ stylus scoped
 ```
 
 ```js
+import Vue from 'vue';
 import { addClass } from './utils';
+
+let ua, isIphone;
+if (!Vue.prototype.$isServer) {
+  ua = navigator.userAgent.toLowerCase();
+  isIphone = ua.match(/iphone/i);
+}
 
 export default {
   data() {
+    let isFringe = false;
+    let safeInsetTop = 0;
+    let safeAreaInsetTopStyle;
+    let scrollerStyle;
+    let navBarH = 44; // dp
+
+    if (!this.$isServer) {
+      let isFringeM = ua.match(/isfringe\s+([true|false|0|1])\s*/);
+      const safeInsetTopM = ua.match(/safeinsettop\s+(\d+)\s*/);
+
+      isFringe = isFringeM && isFringeM[1];
+      switch (isFringe) {
+        case 'false':
+        case '0':
+          isFringe = 0;
+          break;
+
+        case 'true':
+        case '1':
+          isFringe = 1;
+          break;
+        default:
+          break;
+      }
+
+      safeInsetTop = Number((safeInsetTopM && safeInsetTopM[1]) || 0);
+
+      if (isFringe && safeInsetTop) {
+        let top = safeInsetTop;
+        if (isIphone) {
+          top *= window.devicePixelRatio;
+          navBarH *= window.devicePixelRatio;
+        }
+
+        safeAreaInsetTopStyle = {
+          paddingTop: `${top}px`,
+        };
+        scrollerStyle = {
+          top: `${top + navBarH}px`,
+        };
+      } else {
+        safeAreaInsetTopStyle = {};
+        scrollerStyle = {};
+      }
+    }
+
     return {
       safeAreaInsetTopVisible: true,
+      isFringe,
+      scrollerStyle,
+      safeAreaInsetTopStyle,
     };
   },
 
@@ -247,52 +313,14 @@ export default {
   },
 
   mounted() {
-    this.initScrollerPosition();
+    if (this.isFringe) {
+      // 处理底部安全区域
+      addClass(this.$root.$el, 'fringe-screen');
+    }
   },
 
   methods: {
-    initScrollerPosition() {
-      const scroller = this.$refs['scroller'];
-      if (this.safeAreaInsetTopVisible) {
-        scroller.style.top = `${scroller.offsetTop}px`;
-      }
-
-      if (typeof this.$bridge === 'undefined') {
-        return;
-      }
-
-      const isIphone = navigator.userAgent.toLocaleLowerCase().match(/iphone/i);
-
-      const redraw = () => {
-        this.$bridge.call('getDeviceInfo').then(res => {
-          const { safeInsetTop, isFringe } = res.data || {};
-          if (!safeInsetTop || !isFringe) {
-            return;
-          }
-
-          this.$el.classList.add('fringe-screen');
-
-          // safeInsetTop 为设备像素dp
-          let top = safeInsetTop;
-          if (isIphone) {
-            top *= window.devicePixelRatio;
-          }
-
-          this.$refs['safeAreaInsetTop'].style['padding-top'] = `${Math.max(top, 40)}px`;
-          this.$nextTick(() => {
-            scroller.style.top = `${this.$refs['topBar'].offsetHeight}px`;
-          });
-        });
-      };
-
-      redraw();
-      if (isIphone) {
-        setTimeout(redraw, 3000);
-      }
-    },
-
-    getAndroidVersion(ua) {
-      ua = (ua || navigator.userAgent).toLowerCase();
+    getAndroidVersion() {
       const match = ua.match(/android\s*([0-9\.]*)/i);
       return match ? match[1] : false;
     },
@@ -304,55 +332,57 @@ export default {
 
 主观题班级作业试题总览
 ```html
-<layout :class="['question-overview', `status${status}`, `score-status${scoreStatus}`]">
-  <nav-bar slot="header" title="试题总览" to="native"></nav-bar>
-  <div class="container-top">
-    <objective-question
-      v-if="pageType === 0"
-      :result-data="resultData"
-      :countdown="countdown">
-    </objective-question>
+<div :class="['question-overview', `status${status}`, `score-status${scoreStatus}`]">
+  <layout>
+    <nav-bar slot="header" title="试题总览" to="native"></nav-bar>
+    <div class="container-top">
+      <objective-question
+        v-if="pageType === 0"
+        :result-data="resultData"
+        :countdown="countdown">
+      </objective-question>
 
-    <subjective-question
-      v-if="pageType === 1"
-      :result-data="resultData"
-      :countdown="countdown">
-    </subjective-question>
+      <subjective-question
+        v-if="pageType === 1"
+        :result-data="resultData"
+        :countdown="countdown">
+      </subjective-question>
 
-    <all-question
-      v-if="pageType === 2"
-      :result-data="resultData"
-      :countdown="countdown">
-    </all-question>
-  </div>
-
-  <div slot="footer" class="footer-btns" v-if="pageType !== -1">
-    <div
-      class="btn safe-el"
-      v-if="canAnswerQuestion"
-      @click="slideIn('/aladdin/view/answer')">
-      继续答题
+      <all-question
+        v-if="pageType === 2"
+        :result-data="resultData"
+        :countdown="countdown">
+      </all-question>
     </div>
 
-    <div
-      class="btn safe-el"
-      v-if="canScoring"
-      @click="slideIn('/aladdin/view/score')">
-      继续打分
-    </div>
+    <div slot="footer" class="footer-btns" v-if="pageType !== -1">
+      <div
+        class="btn safe-el"
+        v-if="canAnswerQuestion"
+        @click="slideIn('/aladdin/view/answer')">
+        继续答题
+      </div>
 
-    <div
-      class="btn safe-el"
-      v-if="canViewAnalyze"
-      @click="slideIn({ path: '/aladdin/view/analyze', query: { status } })">
-      查看解析
-    </div>
+      <div
+        class="btn safe-el"
+        v-if="canScoring"
+        @click="slideIn('/aladdin/view/score')">
+        继续打分
+      </div>
 
-    <div class="btn safe-el disabled" v-if="publicityAnswerTimeStr">
-      {{ publicityAnswerTimeStr }}公布答案
+      <div
+        class="btn safe-el"
+        v-if="canViewAnalyze"
+        @click="slideIn({ path: '/aladdin/view/analyze', query: { status } })">
+        查看解析
+      </div>
+
+      <div class="btn safe-el disabled" v-if="publicityAnswerTimeStr">
+        {{ publicityAnswerTimeStr }}公布答案
+      </div>
     </div>
-  </div>
-</layout>
+  </layout>
+</div>
 ```
 
 主观题班级作业答题页
@@ -424,7 +454,6 @@ export default {
 
     <footer-bar
       slot="footer"
-      class="safe-el"
       v-if="questions && questions.length > 0"
       :question-indicator-value="`${slideIndex + 1}/${questions.length}`"
       @showAnswerQuestionCardEvent="answerQuestionCardVisible = true"
