@@ -235,7 +235,17 @@ import Vue from 'vue';
 import { addClass } from './utils';
 
 let ua, isIphone;
+
 if (!Vue.prototype.$isServer) {
+  /*
+   * IOS UA: User-Agent  Mozilla/5.0 (iPhone; CPU iPhone OS 11_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15F79/KaiKeLa/3.6.1 (iPhone 7; iOS 11.4; Scale/2.00; appVersion 3.6.1; IsFringe 0; SafeInsetTop 0; SafeInsetBottom 0; Density 2)
+   *
+   * IsFringe 为1表示刘海屏，为0反之
+   * SafeInsetTop 安全区域距离屏幕下边的距离
+   * SafeInsetBottom 安全区域距离屏幕顶部的距离
+   * Density 像素密度
+   */
+
   ua = navigator.userAgent.toLowerCase();
   isIphone = ua.match(/iphone/i);
 }
@@ -298,7 +308,7 @@ export default {
 
   created() {
     if (!this.$isServer) {
-      if (navigator.userAgent.toLowerCase().match('micromessenger')) {
+      if (ua.match('micromessenger')) {
         addClass(this.$el, 'wechart-env');
         this.safeAreaInsetTopVisible = false;
       } else {
