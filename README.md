@@ -165,7 +165,6 @@ stylus scoped
   top 0px
   right 0px
   bottom 0px
-  background-color #f5f5f5
 
   &.hidden {
     visibility hidden
@@ -191,13 +190,13 @@ stylus scoped
     }
   }
 
+  &.no-topbar &-scroller,
   &.wechart-env &-scroller {
     top: 0px!important;
   }
 
   &-scroller {
     color #333
-    background-color #fff
     overflow-x hidden
     overflow-y scroll
     -webkit-overflow-scrolling touch
@@ -255,18 +254,20 @@ if (!Vue.prototype.$isServer) {
 }
 
 export default {
+  props: {
+    topBarVisible: {
+      type: Boolean,
+      default: true,
+    },
+  },
+
   data() {
     let isFringe = false;
-    let safeInsetTop = 0;
-    let safeAreaInsetTopStyle;
-    let scrollerStyle;
-    let navBarH = 44; // dp
 
     if (!this.$isServer) {
       let isFringeM = ua.match(/isfringe\s+([true|false|0|1])\s*/);
-      const safeInsetTopM = ua.match(/safeinsettop\s+(\d+)\s*/);
-
       isFringe = isFringeM && isFringeM[1];
+
       switch (isFringe) {
         case 'false':
         case '0':
@@ -280,12 +281,39 @@ export default {
         default:
           break;
       }
+    }
 
+    if (!this.topBarVisible) {
+      return {
+        safeAreaInsetTopVisible: false,
+        isFringe,
+        scrollerStyle: {},
+        safeAreaInsetTopStyle: {},
+      };
+    }
+
+    let safeInsetTop = 0;
+    let safeAreaInsetTopStyle;
+    let scrollerStyle;
+    let navBarH = 44; // dp
+    let manualDpr;
+
+    if (!this.$isServer) {
+      const viewEl = document.querySelector('meta[name=viewport]');
+      if (viewEl) {
+        const dprM = viewEl.getAttribute('content').match(/initial-scale=(\d)/);
+        manualDpr = Number((dprM && dprM[1]) || 0);
+      }
+
+      const safeInsetTopM = ua.match(/safeinsettop\s+(\d+)\s*/);
       safeInsetTop = Number((safeInsetTopM && safeInsetTopM[1]) || 0);
 
       if (isFringe && safeInsetTop) {
         let top = safeInsetTop;
         if (isIphone) {
+          if (manualDpr && manualDpr === 1) {
+            return;
+          }
           top *= window.devicePixelRatio;
           navBarH *= window.devicePixelRatio;
         }
