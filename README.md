@@ -233,6 +233,115 @@ stylus scoped
   }
 }
 ```
+JavaScript
+```js
+import Vue from 'vue';
+import { addClass } from './utils';
+
+let ua, isIphone;
+
+if (!Vue.prototype.$isServer) {
+  /*
+   * IOS UA: User-Agent  Mozilla/5.0 (iPhone; CPU iPhone OS 11_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15F79/KaiKeLa/3.6.1 (iPhone 7; iOS 11.4; Scale/2.00; appVersion 3.6.1; IsFringe 0; SafeInsetTop 0; SafeInsetBottom 0; Density 2)
+   *
+   * IsFringe 为1表示刘海屏，为0反之
+   * SafeInsetTop 安全区域距离屏幕下边的距离
+   * SafeInsetBottom 安全区域距离屏幕顶部的距离
+   * Density 像素密度
+   */
+
+  ua = navigator.userAgent.toLowerCase();
+  isIphone = ua.match(/iphone/i);
+}
+
+export default {
+  data() {
+    let isFringe = false;
+    let safeInsetTop = 0;
+    let safeAreaInsetTopStyle;
+    let scrollerStyle;
+    let navBarH = 44; // dp
+
+    if (!this.$isServer) {
+      let isFringeM = ua.match(/isfringe\s+([true|false|0|1])\s*/);
+      const safeInsetTopM = ua.match(/safeinsettop\s+(\d+)\s*/);
+
+      isFringe = isFringeM && isFringeM[1];
+      switch (isFringe) {
+        case 'false':
+        case '0':
+          isFringe = 0;
+          break;
+
+        case 'true':
+        case '1':
+          isFringe = 1;
+          break;
+        default:
+          break;
+      }
+
+      safeInsetTop = Number((safeInsetTopM && safeInsetTopM[1]) || 0);
+
+      if (isFringe && safeInsetTop) {
+        let top = safeInsetTop;
+        if (isIphone) {
+          top *= window.devicePixelRatio;
+          navBarH *= window.devicePixelRatio;
+        }
+
+        safeAreaInsetTopStyle = {
+          paddingTop: `${top}px`,
+        };
+        scrollerStyle = {
+          top: `${top + navBarH}px`,
+        };
+      } else {
+        safeAreaInsetTopStyle = {};
+        scrollerStyle = {};
+      }
+    }
+
+    return {
+      safeAreaInsetTopVisible: true,
+      isFringe,
+      scrollerStyle,
+      safeAreaInsetTopStyle,
+    };
+  },
+
+  created() {
+    if (!this.$isServer) {
+      if (ua.match('micromessenger')) {
+        addClass(this.$el, 'wechart-env');
+        this.safeAreaInsetTopVisible = false;
+      } else {
+        const version = Number(this.getAndroidVersion());
+
+        // Android 4.4 以下沉浸式不支持
+        if (version && version < 4.4) {
+          this.safeAreaInsetTopVisible = false;
+        }
+      }
+    }
+  },
+
+  mounted() {
+    if (this.isFringe) {
+      // 处理底部安全区域
+      addClass(this.$root.$el, 'fringe-screen');
+    }
+  },
+
+  methods: {
+    getAndroidVersion() {
+      const match = ua.match(/android\s*([0-9\.]*)/i);
+      return match ? match[1] : false;
+    },
+  },
+};
+```
+
 
 ## 7、使用示例（Layout NavBar）
 
