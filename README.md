@@ -265,7 +265,7 @@ export default {
     let isFringe = false;
 
     if (!this.$isServer) {
-      let isFringeM = ua.match(/isfringe\s+([true|false|0|1])\s*/);
+      const isFringeM = ua.match(/isfringe\s+([true|false|0|1])\s*/);
       isFringe = isFringeM && isFringeM[1];
 
       switch (isFringe) {
@@ -301,7 +301,7 @@ export default {
     if (!this.$isServer) {
       const viewEl = document.querySelector('meta[name=viewport]');
       if (viewEl) {
-        const dprM = viewEl.getAttribute('content').match(/initial-scale=(\d)/);
+        const dprM = viewEl.getAttribute('content').match(/initial-scale=([\d\.]+)/);
         manualDpr = Number((dprM && dprM[1]) || 0);
       }
 
@@ -311,11 +311,10 @@ export default {
       if (isFringe && safeInsetTop) {
         let top = safeInsetTop;
         if (isIphone) {
-          if (manualDpr && manualDpr === 1) {
-            return;
+          if (!manualDpr || manualDpr !== 1) {
+            top *= window.devicePixelRatio;
+            navBarH *= window.devicePixelRatio;
           }
-          top *= window.devicePixelRatio;
-          navBarH *= window.devicePixelRatio;
         }
 
         safeAreaInsetTopStyle = {
